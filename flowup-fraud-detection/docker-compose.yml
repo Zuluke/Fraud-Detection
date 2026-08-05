@@ -1,0 +1,51 @@
+# =============================================================================
+# FlowUp Fraud Detection - Docker Compose
+# =============================================================================
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: flowup-fraud-detection
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    environment:
+      - MODEL_PATH=${MODEL_PATH:-models/fraud_model.joblib}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - THRESHOLD=${THRESHOLD:-0.5}
+      - REDIS_URL=redis://redis:6379/0
+      - APP_PORT=8000
+      - APP_HOST=0.0.0.0
+      - MODEL_VERSION=${MODEL_VERSION:-1.0.0}
+    volumes:
+      - ./models:/app/models:ro
+      - ./logs:/app/logs
+    depends_on:
+      redis:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    container_name: flowup-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+volumes:
+  redis_data:
+    driver: local
